@@ -1,0 +1,35 @@
+FROM maven:3.6.3-jdk-11
+
+RUN mvn archetype:generate \
+    -DarchetypeGroupId=org.kie.kogito \
+    -DarchetypeArtifactId=kogito-quarkus-archetype \
+    -DgroupId=org.acme -DartifactId=kogito-quickstart \
+    -DarchetypeVersion=0.12.0 \
+    -Dversion=1.0-SNAPSHOT \
+    -DinteractiveMode=false
+
+RUN printf "\nquarkus.swagger-ui.always-include=true" >> kogito-quickstart/src/main/resources/application.properties
+RUN printf "\nkogito.decisions.stronglytyped=true" >> kogito-quickstart/src/main/resources/application.properties
+
+RUN mkdir -p kogito-quickstart/src/main/resources/org/acme/kogito
+
+RUN chown 1001 /kogito-quickstart \
+    && chmod "g+rwX" /kogito-quickstart \
+    && chown 1001:root /kogito-quickstart
+
+
+WORKDIR kogito-quickstart
+
+ENV JAVA_OPTIONS="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
+
+RUN mvn dependency:go-offline -Duser.home=/var/maven
+RUN mvn clean package -DskipTests -Duser.home=/var/maven
+RUN mvn clean
+
+EXPOSE 8080
+USER 1001
+
+CMD mvn package -T 4 -Dmaven.test.skip -DskipTests -Duser.home=/var/maven; java -jar target/kogito-quickstart-1.0-SNAPSHOT-runner.jar
+
+# docker build -f executor.jvm . -t test
+# docker run -p 8080:8080 -v /home/jrota/vagrant/bionic64/RH/kogito-examples-fork/dmn-drools-quarkus-metrics/src/main/resources/org/kie/kogito/examples/LoanEligibility.dmn:/kogito-quickstart/src/main/resources/LoanEligibility.dmn -it test:latest
